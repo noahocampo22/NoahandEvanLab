@@ -2,17 +2,13 @@ import streamlit as st
 import requests
 from datetime import datetime, timedelta
 
-# --- Page Setup ---
-st.set_page_config(page_title="Stock Chatbot", page_icon="🤖", layout="centered")
 st.title("🤖 AI Stock Chatbot")
 st.write("Ask any question about recent stock performance trends.")
 
-# --- Inputs ---
 symbol = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA):", "AAPL").upper()
 user_question = st.text_area("Ask a question about this stock:", placeholder="e.g. Were prices in March higher than usual?")
 num_days = st.slider("How many trading days to include:", 5, 200, 60)
 
-# --- Fetch stock data from Alpha Vantage ---
 def get_stock_history(symbol, num_days):
     try:
         api_key = "FEX36O299U3YARGP"
@@ -21,7 +17,7 @@ def get_stock_history(symbol, num_days):
             "function": "TIME_SERIES_DAILY",
             "symbol": symbol,
             "apikey": api_key,
-            "outputsize": "full"  # 🔁 Gives access to older data like March
+            "outputsize": "full"
         }
         response = requests.get(url, params=params)
         data = response.json()
@@ -51,7 +47,6 @@ def get_stock_history(symbol, num_days):
         st.error(f"Error fetching stock data: {e}")
         return None
 
-# --- Format data for Gemini ---
 def format_stock_summary(symbol, data):
     summary = f"Recent stock data for {symbol.upper()}:\n"
     for entry in data:
@@ -59,7 +54,6 @@ def format_stock_summary(symbol, data):
                     f"Low={entry['low']}, Close={entry['close']}, Volume={entry['volume']}\n")
     return summary
 
-# --- Gemini API Request ---
 def ask_gemini(prompt):
     try:
         gemini_key = "AIzaSyDV9L06iMrD4vf-PDnOFUqo0P_3ijsV4AQ"
@@ -79,7 +73,6 @@ def ask_gemini(prompt):
     except Exception as e:
         return f"⚠️ Gemini API Error: {e}"
 
-# --- Ask button logic ---
 if st.button("Ask Gemini"):
     if not symbol or not user_question.strip():
         st.warning("Please enter a stock symbol and a question.")
