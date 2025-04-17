@@ -59,7 +59,7 @@ def format_stock_summary(symbol, data):
 
 def ask_gemini(prompt):
     try:
-        key = st.secrets['key']
+        key = "FEX36O299U3YARGP
         gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
         headers = {"Content-Type": "application/json"}
         body = {
