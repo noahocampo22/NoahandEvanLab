@@ -3,42 +3,41 @@ import requests
 import pandas as pd
 from datetime import datetime
 
-# --- Page setup ---
-st.set_page_config(page_title="Stocks Page", page_icon="📈", layout="centered")
-st.title("📈 Stocks Page")
-st.write("Analyze historical stock price data using the Alpha Vantage API.")
+# --- Page Setup ---
+st.set_page_config(page_title="Stocks Viewer", page_icon="📊", layout="centered")
+st.title("📊 Stock Price Viewer")
+st.write("Explore historical stock price data using the Alpha Vantage API.")
 
 # --- User Inputs ---
-symbol = st.text_input("Enter Stock Symbol (e.g., AAPL, MSFT):", "AAPL").upper()
-price_type = st.selectbox("Select Price Type:", ["Open", "High", "Low", "Close"])
-days = st.slider("Select number of days to display:", 10, 1000, 30)
-st.caption("Note: You can enter a symbol and view data going back years. Max 20+ years of historical records.")
+symbol = st.text_input("Enter a stock symbol (e.g., AAPL, MSFT):", value="AAPL").upper()
+price_type = st.selectbox("Select price type to view:", ["Open", "High", "Low", "Close"])
+num_days = st.slider("How many days of data to display?", 10, 1000, 30)
 
-# --- Fetch stock data ---
+# --- Fetch Stock Data ---
 def fetch_stock_data(symbol):
-    api_key = st.secrets["key"]  # Pull Gemini/Alpha Vantage key from Streamlit secrets
+    api_key = "FEX36O299U3YARGP"  # 🔑 Hardcoded Alpha Vantage API key
     url = "https://www.alphavantage.co/query"
     params = {
         "function": "TIME_SERIES_DAILY",
         "symbol": symbol,
         "apikey": api_key,
-        "outputsize": "full"  # Get full history (enables >1000 days if needed)
+        "outputsize": "full"
     }
     response = requests.get(url, params=params)
     if response.status_code == 200:
         return response.json()
     return None
 
-# --- Display data ---
+# --- Process and Display ---
 if st.button("Fetch Stock Data"):
     data = fetch_stock_data(symbol)
 
     if data is None:
-        st.error("❌ No response from Alpha Vantage API.")
+        st.error("❌ Could not connect to the API.")
     elif "Note" in data:
-        st.warning("⚠️ API limit reached. Try again in a minute.")
+        st.warning("⚠️ API rate limit reached. Try again shortly.")
     elif "Error Message" in data:
-        st.error("❌ Invalid stock symbol.")
+        st.error("❌ Invalid stock symbol. Please try again.")
     elif "Time Series (Daily)" in data:
         series = data["Time Series (Daily)"]
         column_map = {
@@ -60,11 +59,11 @@ if st.button("Fetch Stock Data"):
 
         if records:
             df = pd.DataFrame(records)
-            df = df.sort_values("Date").tail(days).set_index("Date")
-            st.subheader(f"{symbol.upper()} - {price_type} Price History")
+            df = df.sort_values("Date").tail(num_days).set_index("Date")
+            st.subheader(f"{symbol} – {price_type} Price (Last {num_days} Days)")
             st.dataframe(df)
             st.line_chart(df)
         else:
-            st.warning("⚠️ No valid price records found.")
+            st.warning("⚠️ No valid data found in the API response.")
     else:
-        st.error("❌ Unexpected API response format.")
+        st.error("❌ Unexpected response structure from the API.")
