@@ -3,19 +3,15 @@ import requests
 import pandas as pd
 from datetime import datetime
 
-# --- Page Setup ---
-st.set_page_config(page_title="Stocks Viewer", page_icon="📊", layout="centered")
 st.title("📊 Stock Price Viewer")
 st.write("Explore historical stock price data using the Alpha Vantage API.")
 
-# --- User Inputs ---
 symbol = st.text_input("Enter a stock symbol (e.g., AAPL, MSFT):", value="AAPL").upper()
 price_type = st.selectbox("Select price type to view:", ["Open", "High", "Low", "Close"])
 num_days = st.slider("How many days of data to display?", 10, 1000, 30)
 
-# --- Fetch Stock Data ---
 def fetch_stock_data(symbol):
-    api_key = "FEX36O299U3YARGP"  # 🔑 Hardcoded Alpha Vantage API key
+    api_key = "FEX36O299U3YARGP"  
     url = "https://www.alphavantage.co/query"
     params = {
         "function": "TIME_SERIES_DAILY",
@@ -28,7 +24,6 @@ def fetch_stock_data(symbol):
         return response.json()
     return None
 
-# --- Process and Display ---
 if st.button("Fetch Stock Data"):
     data = fetch_stock_data(symbol)
 
