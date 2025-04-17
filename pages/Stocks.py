@@ -1,104 +1,69 @@
 import streamlit as st
 import requests
-from datetime import datetime, timedelta
+import pandas as pd
+from datetime import datetime
 
-# --- Page Setup ---
-st.set_page_config(page_title="Stock Chatbot", page_icon="🤖", layout="centered")
-st.title("🤖 AI Stock Chatbot")
-st.write("Ask any question about recent trends in stock performance!")
+st.set_page_config(page_title="Stocks Page", page_icon="📈", layout="centered")
+st.title("📈 Stocks Page")
+st.write("Analyze historical stock price data using the Alpha Vantage API.")
 
 # --- Inputs ---
-symbol = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA):", "AAPL").upper()
-user_question = st.text_area("Ask a question about recent stock trends:", placeholder="e.g. Were prices in March higher than usual?")
-num_days = st.slider("How many recent trading days to include in context:", 5, 100, 30)
+symbol = st.text_input("Enter Stock Symbol (e.g., AAPL, MSFT):", "AAPL").upper()
+price_type = st.selectbox("Select Price Type:", ["Open", "High", "Low", "Close"])
+days = st.slider("Select number of days to display:", 10, 1000, 30)
+st.caption("Note: You can enter a symbol and view data going back years. Max 20+ years of historical records.")
 
-# --- Fetch stock data from Alpha Vantage ---
-def get_stock_history(symbol, num_days):
-    try:
-        api_key = "FEX36O299U3YARGP"
-        url = "https://www.alphavantage.co/query"
-        params = {
-            "function": "TIME_SERIES_DAILY",
-            "symbol": symbol,
-            "apikey": api_key,
-            "outputsize": "full"  # So we can go back farther than 100 days if needed
+# --- Fetch Alpha Vantage stock data ---
+def fetch_stock_data(symbol):
+    api_key = st.secrets["key"]  # Secure API key
+    url = "https://www.alphavantage.co/query"
+    params = {
+        "function": "TIME_SERIES_DAILY",
+        "symbol": symbol,
+        "apikey": api_key,
+        "outputsize": "full"  # To allow showing up to 1000+ days
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    return None
+
+# --- Main UI logic ---
+if st.button("Fetch Stock Data"):
+    data = fetch_stock_data(symbol)
+
+    if data is None:
+        st.error("❌ No response from API.")
+    elif "Note" in data:
+        st.warning("⚠️ API call frequency limit reached. Wait and try again.")
+    elif "Error Message" in data:
+        st.error("❌ Invalid stock symbol.")
+    elif "Time Series (Daily)" in data:
+        series = data["Time Series (Daily)"]
+        column_map = {
+            "Open": "1. open",
+            "High": "2. high",
+            "Low": "3. low",
+            "Close": "4. close"
         }
-        response = requests.get(url, params=params)
-        data = response.json()
-
-        series = data.get("Time Series (Daily)", {})
-        if not series:
-            return None
-
+        key = column_map[price_type]
         records = []
-        for date_str in sorted(series.keys(), reverse=True):
+
+        for date_str, values in series.items():
             try:
-                record_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-                if len(records) >= num_days:
-                    break
-                stock = series[date_str]
-                records.append({
-                    "date": date_str,
-                    "open": stock["1. open"],
-                    "high": stock["2. high"],
-                    "low": stock["3. low"],
-                    "close": stock["4. close"],
-                    "volume": stock["5. volume"]
-                })
+                date = datetime.strptime(date_str, "%Y-%m-%d")
+                price = float(values[key])
+                records.append({"Date": date, f"{price_type} Price": price})
             except:
                 continue
-        return records
-    except Exception as e:
-        st.error(f"Error fetching stock data: {e}")
-        return None
 
-# --- Format data into a summary string for Gemini ---
-def format_stock_summary(symbol, data):
-    summary = f"Recent stock data for {symbol.upper()}:\n"
-    for entry in data:
-        summary += (f"{entry['date']}: Open={entry['open']}, High={entry['high']}, "
-                    f"Low={entry['low']}, Close={entry['close']}, Volume={entry['volume']}\n")
-    return summary
-
-# --- Gemini API Request ---
-def ask_gemini(prompt):
-    try:
-        key = "AIzaSyDV9L06iMrD4vf-PDnOFUqo0P_3ijsV4AQ"  # Replace with your actual key
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
-        headers = {"Content-Type": "application/json"}
-        body = {
-            "contents": [{
-                "role": "user",
-                "parts": [{"text": prompt}]
-            }]
-        }
-        response = requests.post(gemini_url, headers=headers, json=body)
-        if response.status_code != 200:
-            raise Exception(f"Gemini API error {response.status_code}: {response.text}")
-        result = response.json()
-        return result["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        return f"⚠️ Gemini API Error: {e}"
-
-# --- Ask button logic ---
-if st.button("Ask Gemini"):
-    if not symbol or not user_question.strip():
-        st.warning("Please enter a symbol and a question.")
-    else:
-        st.info("Fetching stock data...")
-        stock_data = get_stock_history(symbol, num_days)
-        if not stock_data:
-            st.error("Unable to retrieve stock data. Please check the symbol or try again later.")
+        if records:
+            df = pd.DataFrame(records)
+            df = df.sort_values("Date").tail(days).set_index("Date")
+            st.subheader(f"{symbol.upper()} - {price_type} Price History")
+            st.dataframe(df)
+            st.line_chart(df)
         else:
-            summary = format_stock_summary(symbol, stock_data)
-            prompt = f"""
-            The user will ask a question about stock trends. Use the data below to answer with helpful insights.
-
-            {summary}
-
-            Question: {user_question.strip()}
-            """
-            st.info("Sending data to Gemini...")
-            reply = ask_gemini(prompt)
-            st.markdown("### 💬 Gemini’s Answer")
-            st.success(reply.strip())
+            st.error("⚠️ No valid data points returned.")
+    else:
+        st.error("❌ Unexpected API response.")
